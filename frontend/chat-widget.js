@@ -22,13 +22,12 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("✅ Chat Widget initialized successfully");
 
     // ================== SESSION MANAGEMENT ==================
-    // 🧪 TEST: Usa ID fisso semplice invece di UUID lungo
-    const SESSION_ID = "010101";
-    console.log("🧪 Using fixed SESSION_ID for testing:", SESSION_ID);
+    // Genera SESSION_ID unico per ogni sessione
+    const SESSION_ID = generateSessionId();
 
     // ================== CONFIGURATION ==================
     const WS_URL = "ws://localhost:8000/chat"; // WebSocket backend URL
-    const DEBUG_ENABLED = true;
+    const DEBUG_ENABLED = false;
     let websocket = null;
     let nudgeInterval = null;
 
@@ -36,6 +35,11 @@ document.addEventListener("DOMContentLoaded", () => {
         if (DEBUG_ENABLED) {
             console.log("[CHAT WIDGET]", ...args);
         }
+    }
+
+    // ================== UTILITY FUNCTIONS ==================
+    function generateSessionId() {
+        return 'session_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
     }
 
     // ================== CHAT STATE MANAGEMENT ==================
@@ -453,5 +457,5 @@ document.addEventListener("DOMContentLoaded", () => {
         log("Chat widget ready for interactions");
     }, 500);
 
-    log("Chat Widget fully initialized with session:", SESSION_ID);
+    log("Chat Widget fully initialized");
 });

@@ -149,11 +149,11 @@ Chat History: {chat_history}
         agent_executor = AgentExecutor(
             agent=agent,
             tools=self.tools,
-            verbose=True,
+            verbose=False,
             handle_parsing_errors=self._handle_parsing_error,  # Funzione custom
             max_iterations=5,
             return_intermediate_steps=False,
-            early_stopping_method="generate",  # Forza generazione di Final Answer
+            # early_stopping_method="generate",  # Forza generazione di Final Answer
         )
 
         return agent_executor
@@ -208,52 +208,29 @@ Final Answer: Mi dispiace, ho riscontrato un problema tecnico. Potresti riformul
         Returns:
             Risposta dell'agent
         """
-        print(
-            f"🔍 PROCESS_MESSAGE START: user_id='{user_id}', message='{user_message}'"
-        )
-
         try:
             # Aggiungi user_id al context per i tools
             enhanced_message = f"[USER_ID: {user_id}] {user_message}"
-            print(f"🔍 Enhanced message: '{enhanced_message}'")
 
-            print(f"🔍 Invoking agent_with_history...")
             # Esegui agent con history automatica
             result = self.agent_with_history.invoke(
                 {"input": enhanced_message},
                 config={"configurable": {"session_id": user_id}},
             )
-            print(f"🔍 Agent result type: {type(result)}")
-            print(
-                f"🔍 Agent result keys: {result.keys() if isinstance(result, dict) else 'Not a dict'}"
-            )
-            print(f"🔍 Agent result: {result}")
 
             # Estrai output e verifica che sia presente
             output = result.get("output", "")
-            print(f"🔍 Output extracted: '{output}'")
-            print(f"🔍 Output length: {len(output) if output else 0}")
 
             # Se l'output è vuoto o contiene solo messaggi di errore tecnici
             if not output or "I'm sorry" in output or "mistake" in output:
-                print(
-                    "🔍 Using fallback response - output is empty or contains error messages"
-                )
                 fallback_result = self._fallback_response(user_message, user_id)
-                print(f"🔍 Fallback result: '{fallback_result}'")
                 return fallback_result
 
-            print(f"🔍 Returning output: '{output}'")
             return output
 
         except Exception as e:
-            print(f"❌ Error in process_message: {str(e)}")
-            print(f"❌ Error type: {type(e)}")
-            import traceback
-
-            print(f"❌ Traceback: {traceback.format_exc()}")
+            print(f"Error in process_message: {str(e)}")
             fallback_result = self._fallback_response(user_message, user_id)
-            print(f"🔍 Fallback result after error: '{fallback_result}'")
             return fallback_result
 
     def _fallback_response(self, user_message: str, user_id: str) -> str:

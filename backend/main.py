@@ -30,50 +30,37 @@ async def chat_endpoint(websocket: WebSocket, user_id: str):
     """
     await websocket.accept()
 
-    # 🧪 TEST: Usa un ID fisso per testare se il problema è nell'UUID lungo
-    actual_user_id = "vincenzo01"  # Temporaneo per test
-    print(
-        f"💬 Nuovo utente connesso: '{user_id}' -> usando '{actual_user_id}' per test"
-    )
-
     try:
         while True:
             # Ricevi messaggio utente
             user_message = await websocket.receive_text()
 
-            # Invece di ThreadPoolExecutor, esegui direttamente:
-            print(f" Processing message directly (no ThreadPoolExecutor)")
-            response = movie_agent.process_message(user_message, actual_user_id)
-            print(f" Direct processing completed, response: '{response}'")
+            # Processa messaggio con l'agent
+            response = movie_agent.process_message(user_message, user_id)
 
             # Verifica che la connessione sia ancora aperta prima di inviare
             if websocket.client_state == WebSocketState.CONNECTED:
-                print(f"🔍 WebSocket still connected, sending response")
                 try:
                     await websocket.send_text(response)
-                    print(f" WebSocket response sent successfully")
                 except Exception as send_error:
-                    print(f"❌ Error sending response: {send_error}")
+                    print(f"Error sending response: {send_error}")
                     break
             else:
-                print(
-                    f"⚠️ Connessione chiusa durante processing per utente: {actual_user_id}"
-                )
                 break
 
     except WebSocketDisconnect as e:
-        print(f"🔌 Utente disconnesso: {actual_user_id} - Codice: {e.code}")
+        print(f"User disconnected: {user_id} - Code: {e.code}")
     except ConnectionClosedError:
-        print(f"🔌 Connessione chiusa prematuramente per utente: {actual_user_id}")
+        print(f"Connection closed prematurely for user: {user_id}")
     except Exception as e:
-        print(f"❌ Errore nella chat per {actual_user_id}: {e}")
+        print(f"Error in chat for {user_id}: {e}")
     finally:
         # Chiusura sicura - controlla stato prima di chiudere
         try:
             if websocket.client_state == WebSocketState.CONNECTED:
                 await websocket.close()
         except Exception as e:
-            print(f"⚠️ Errore durante chiusura WebSocket: {e}")
+            print(f"Error during WebSocket closure: {e}")
 
 
 @app.get("/health")
@@ -95,8 +82,7 @@ async def test_info():
 if __name__ == "__main__":
     import uvicorn
 
-    print("🚀 Avvio Netflix AI Chat Backend...")
-    print("📡 WebSocket endpoint: ws://localhost:8000/chat/{user_id}")
-    print("🔍 Health check: http://localhost:8000/health")
-    print("🧪 Test info: http://localhost:8000/test-info")
+    print("Starting Netflix AI Chat Backend...")
+    print("WebSocket endpoint: ws://localhost:8000/chat/{user_id}")
+    print("Health check: http://localhost:8000/health")
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, log_level="info")

@@ -30,42 +30,31 @@ class UserHistoryTool:
         Returns:
             Storico conversazioni formattato
         """
-        print(f"🔍 USER_HISTORY_TOOL: user_id='{user_id}', query='{current_query}'")
-        
         try:
             # FILTRO ESATTO per user_id nei metadata
             filter_dict = {"user_id": user_id}
-            print(f"🔍 Filter dict: {filter_dict}")
 
             # Query semantica per il contenuto (se fornito)
             query = current_query if current_query else "conversazioni utente"
-            print(f"🔍 Search query: '{query}'")
 
             # Ricerca con filtro esatto sui metadata
-            print(f"🔍 Performing similarity_search...")
             docs = self.vectorstore.similarity_search(
                 query=query,
                 k=3,  # Max 3 conversazioni
                 filter=filter_dict,  # FILTRO ESATTO per user_id
             )
-            print(f"🔍 Found {len(docs)} documents")
 
             if not docs:
-                result = f"🆕 Primo incontro con l'utente {user_id}"
-                print(f"🔍 No docs found, returning: '{result}'")
-                return result
+                return f"🆕 Primo incontro con l'utente {user_id}"
 
             # Formatta storico conversazioni
             history_text = f"📋 **STORICO CONVERSAZIONI - Utente {user_id}:**\n\n"
-            print(f"🔍 Formatting {len(docs)} documents...")
 
             for i, doc in enumerate(docs, 1):
                 meta = doc.metadata
-                print(f"🔍 Doc {i} metadata: {meta}")
 
                 # Verifica doppia di sicurezza (dovrebbe essere superflua con il filtro)
                 if meta.get("user_id") != user_id:
-                    print(f"🔍 Skipping doc {i} - user_id mismatch")
                     continue
 
                 history_text += (
@@ -87,15 +76,10 @@ class UserHistoryTool:
 
                 history_text += "\n"
 
-            print(f"🔍 Final history_text length: {len(history_text)}")
             return history_text
 
         except Exception as e:
-            error_msg = f"❌ Errore recupero storico: {str(e)}"
-            print(f"🔍 Exception in get_user_history: {error_msg}")
-            import traceback
-            print(f"🔍 Traceback: {traceback.format_exc()}")
-            return error_msg
+            return f"❌ Errore recupero storico: {str(e)}"
 
     def create_tool(self) -> Tool:
         """Crea langchain Tool object"""
