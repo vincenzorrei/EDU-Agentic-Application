@@ -1,6 +1,6 @@
 /*
- * AI Chat Widget - Full Implementation
- * Following specifications from chat_widget.md
+ * AI Chat Widget - DEBUG VERSION
+ * Added extensive logging to identify the disconnection issue
  */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -22,54 +22,74 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("✅ Chat Widget initialized successfully");
 
     // ================== SESSION MANAGEMENT ==================
-    // 🧪 TEST: Usa ID fisso semplice invece di UUID lungo
-    const SESSION_ID = "010101";
+    const SESSION_ID = "vincenzo01";
     console.log("🧪 Using fixed SESSION_ID for testing:", SESSION_ID);
 
     // ================== CONFIGURATION ==================
-    const WS_URL = "ws://localhost:8000/chat"; // WebSocket backend URL
+    const WS_URL = "ws://localhost:8000/chat";
     const DEBUG_ENABLED = true;
     let websocket = null;
     let nudgeInterval = null;
+    let messageBeingProcessed = false;
+    let lastMessageTime = null;
 
     function log(...args) {
         if (DEBUG_ENABLED) {
-            console.log("[CHAT WIDGET]", ...args);
+            const timestamp = new Date().toISOString().split('T')[1].slice(0, -1);
+            console.log(`[${timestamp}] [CHAT]`, ...args);
+        }
+    }
+
+    // ================== DEBUG: Track all events ==================
+    function debugWebSocketState() {
+        if (websocket) {
+            log(`📊 WebSocket State: readyState=${websocket.readyState}, bufferedAmount=${websocket.bufferedAmount}`);
+        } else {
+            log(`📊 WebSocket is null`);
         }
     }
 
     // ================== CHAT STATE MANAGEMENT ==================
     function openChat() {
+        log("📂 openChat() called");
         panel.classList.add("is-open");
         widget.classList.add("open");
         launcher.setAttribute("aria-expanded", "true");
         input?.focus();
         
-        // Clear hint message when opening
-        const hint = transcript.querySelector('.chat-hint');
-        if (hint && transcript.children.length === 1) {
-            // Keep hint if it's the only element
-        }
-        
         // Connect WebSocket when opening chat
         connectWebSocket();
         
-        log("Chat opened");
+        log("✅ Chat opened");
     }
 
     function closeChat() {
+        log("🚪 closeChat() called");
+        log(`⚠️ Message being processed: ${messageBeingProcessed}`);
+        
+        // DEBUG: Check if we're processing a message
+        if (messageBeingProcessed) {
+            log("⚠️ WARNING: Closing chat while message is being processed!");
+        }
+        
         panel.classList.remove("is-open");
         widget.classList.remove("open");
         launcher.setAttribute("aria-expanded", "false");
         launcher.focus();
         
-        // Close WebSocket connection immediatamente
-        if (websocket && websocket.readyState === WebSocket.OPEN) {
+        // DEBUG: Log before closing WebSocket
+        debugWebSocketState();
+        
+        // DON'T close WebSocket if message is being processed
+        if (messageBeingProcessed) {
+            log("🛑 NOT closing WebSocket - message in progress");
+        } else if (websocket && websocket.readyState === WebSocket.OPEN) {
+            log("❌ Closing WebSocket connection");
             websocket.close(1000, "Chat closed by user");
             websocket = null;
         }
         
-        log("Chat closed");
+        log("✅ Chat panel closed");
     }
 
     // ================== AUTO-RESIZE TEXTAREA ==================
@@ -82,13 +102,15 @@ document.addEventListener("DOMContentLoaded", () => {
     // ================== SEND BUTTON STATE ==================
     function updateSendButton() {
         const hasContent = input.value.trim().length > 0;
-        sendBtn.disabled = !hasContent;
-        sendBtn.setAttribute("aria-disabled", !hasContent);
+        sendBtn.disabled = !hasContent || messageBeingProcessed;
+        sendBtn.setAttribute("aria-disabled", !hasContent || messageBeingProcessed);
     }
 
     // ================== MESSAGE RENDERING ==================
     function appendMessage(text, fromUser = false) {
-        // Remove hint if it exists and this is the first real message
+        log(`💬 appendMessage() - fromUser: ${fromUser}, length: ${text.length}`);
+        
+        // Remove hint if it exists
         const hint = transcript.querySelector('.chat-hint');
         if (hint && transcript.children.length === 1) {
             hint.remove();
@@ -110,17 +132,17 @@ document.addEventListener("DOMContentLoaded", () => {
         transcript.appendChild(wrapper);
         transcript.scrollTop = transcript.scrollHeight;
         
-        return bubble; // Return for typing effect
+        return bubble;
     }
 
     // ================== MARKDOWN RENDERING ==================
     function renderMarkdown(text) {
         let html = text;
         
-        // Normalize markdown for better parsing
+        // Normalize markdown
         html = normalizeMarkdown(html);
         
-        // Headers (must be at start of line)
+        // Headers
         html = html.replace(/^#{6}\s+(.+)$/gm, '<h6>$1</h6>');
         html = html.replace(/^#{5}\s+(.+)$/gm, '<h5>$1</h5>');
         html = html.replace(/^#{4}\s+(.+)$/gm, '<h4>$1</h4>');
@@ -128,11 +150,9 @@ document.addEventListener("DOMContentLoaded", () => {
         html = html.replace(/^#{2}\s+(.+)$/gm, '<h2>$1</h2>');
         html = html.replace(/^#{1}\s+(.+)$/gm, '<h1>$1</h1>');
         
-        // Numbered lists
+        // Lists
         html = html.replace(/^\d+\.\s+(.+)$/gm, '<li>$1</li>');
         html = html.replace(/(<li>.*<\/li>)/s, '<ol>$1</ol>');
-        
-        // Bullet lists
         html = html.replace(/^[-*]\s+(.+)$/gm, '<li>$1</li>');
         html = html.replace(/(<li>.*<\/li>)/s, (match) => {
             if (!match.includes('<ol>')) {
@@ -141,10 +161,6 @@ document.addEventListener("DOMContentLoaded", () => {
             return match;
         });
         
-        // Special list patterns
-        html = html.replace(/^:\d+\s+(.+)$/gm, '<li>$1</li>');
-        html = html.replace(/^:-\s+(.+)$/gm, '<li>$1</li>');
-        
         // Text formatting
         html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
         html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
@@ -152,8 +168,6 @@ document.addEventListener("DOMContentLoaded", () => {
         // Paragraphs
         html = html.replace(/\n\n/g, '</p><p>');
         html = '<p>' + html + '</p>';
-        
-        // Clean up empty paragraphs
         html = html.replace(/<p><\/p>/g, '');
         html = html.replace(/<p>\s*<\/p>/g, '');
         
@@ -161,16 +175,15 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function normalizeMarkdown(text) {
-        // Separate elements that are stuck together
         text = text.replace(/([.!?])([A-Z#])/g, '$1\n\n$2');
         text = text.replace(/([a-z])(\d+\.)/g, '$1\n\n$2');
         text = text.replace(/([a-z])(#{1,6}\s)/g, '$1\n\n$2');
-        
         return text;
     }
 
     // ================== TYPING EFFECT ==================
     function simulateTypingEffect(element, text, speed = 6) {
+        log(`⌨️ Starting typing effect for ${text.length} characters`);
         element.textContent = "";
         let i = 0;
         
@@ -181,10 +194,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 transcript.scrollTop = transcript.scrollHeight;
             } else {
                 clearInterval(typeInterval);
-                // Replace with properly formatted markdown
                 const normalized = normalizeMarkdown(text);
                 element.innerHTML = renderMarkdown(normalized);
                 transcript.scrollTop = transcript.scrollHeight;
+                
+                // Message processing complete
+                log("✅ Typing effect complete, setting messageBeingProcessed = false");
+                messageBeingProcessed = false;
+                updateSendButton();
             }
         }, speed);
         
@@ -193,49 +210,57 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ================== WEBSOCKET COMMUNICATION ==================
     function connectWebSocket() {
+        log("🔌 connectWebSocket() called");
+        debugWebSocketState();
+        
         if (websocket && websocket.readyState === WebSocket.OPEN) {
-            return; // Already connected
+            log("✅ WebSocket already connected");
+            return;
         }
 
-        // Usa SESSION_ID dinamico per ogni utente/sessione
         const wsUrl = `${WS_URL}/${SESSION_ID}`;
-        log("Connecting to WebSocket:", wsUrl);
+        log(`🔌 Creating new WebSocket connection to: ${wsUrl}`);
 
         websocket = new WebSocket(wsUrl);
 
-        websocket.onopen = function() {
-            log("WebSocket connected successfully");
+        websocket.onopen = function(event) {
+            log("✅ WebSocket.onopen fired");
+            debugWebSocketState();
         };
 
         websocket.onmessage = function(event) {
-            const response = event.data;
-            log("WebSocket response:", response);
-            log("WebSocket state after message:", websocket.readyState);
+            const responseTime = Date.now() - lastMessageTime;
+            log(`📨 WebSocket.onmessage fired (response time: ${responseTime}ms)`);
+            log(`📨 Message length: ${event.data.length}`);
+            debugWebSocketState();
 
             // Add bot response with typing effect
             const botBubble = appendMessage("", false);
-            simulateTypingEffect(botBubble, response);
-            
-            log("After adding message, WebSocket state:", websocket.readyState);
+            simulateTypingEffect(botBubble, event.data);
         };
 
         websocket.onclose = function(event) {
-            log("WebSocket closed:", event.code, event.reason);
-            log("WebSocket state at close:", websocket.readyState);
+            log(`🔴 WebSocket.onclose fired - Code: ${event.code}, Reason: "${event.reason}"`);
+            log(`🔴 Clean close: ${event.wasClean}`);
+            debugWebSocketState();
             
-            // Gestisci diversi codici di chiusura
-            if (event.code === 1006) {
-                log("⚠️ Connessione chiusa inaspettatamente");
-                // Potrebbe essere necessario riconnettere
-            } else if (event.code === 1000) {
-                log("✅ Connessione chiusa normalmente");
+            // Analyze close reason
+            if (event.code === 1000) {
+                log("🔴 Normal closure (1000)");
+            } else if (event.code === 1006) {
+                log("🔴 Abnormal closure (1006) - connection lost");
+            } else {
+                log(`🔴 Unexpected close code: ${event.code}`);
             }
             
             websocket = null;
+            messageBeingProcessed = false;
+            updateSendButton();
         };
 
         websocket.onerror = function(error) {
-            log("WebSocket error:", error);
+            log("❌ WebSocket.onerror fired:", error);
+            debugWebSocketState();
             appendMessage("Sorry, I'm having trouble connecting. Please try again.", false);
         };
     }
@@ -244,7 +269,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const trimmed = message.trim();
         if (!trimmed) return;
 
-        log("Sending message:", trimmed);
+        log(`📤 sendMessage() called with: "${trimmed}"`);
+        lastMessageTime = Date.now();
+        messageBeingProcessed = true;
 
         // Add user message
         appendMessage(trimmed, true);
@@ -254,54 +281,50 @@ document.addEventListener("DOMContentLoaded", () => {
         updateSendButton();
         autoResizeTextarea();
 
-        // Disable send button during request
-        sendBtn.disabled = true;
-
         try {
             // Connect WebSocket if needed
             if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+                log("⚠️ WebSocket not open, connecting...");
                 connectWebSocket();
                 
                 // Wait for connection
                 await new Promise((resolve, reject) => {
-                    const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+                    const timeout = setTimeout(() => {
+                        log("❌ WebSocket connection timeout");
+                        reject(new Error("Connection timeout"));
+                    }, 5000);
                     
-                    if (websocket.readyState === WebSocket.OPEN) {
-                        clearTimeout(timeout);
-                        resolve();
-                        return;
-                    }
-                    
-                    websocket.onopen = () => {
-                        clearTimeout(timeout);
-                        resolve();
-                    };
-                    
-                    websocket.onerror = () => {
-                        clearTimeout(timeout);
-                        reject(new Error("Connection failed"));
-                    };
+                    const checkInterval = setInterval(() => {
+                        if (websocket && websocket.readyState === WebSocket.OPEN) {
+                            clearTimeout(timeout);
+                            clearInterval(checkInterval);
+                            log("✅ WebSocket connected, ready to send");
+                            resolve();
+                        }
+                    }, 100);
                 });
             }
 
             // Send message via WebSocket
+            log(`📤 Sending message via WebSocket...`);
+            debugWebSocketState();
             websocket.send(trimmed);
+            log(`✅ Message sent successfully`);
 
         } catch (error) {
-            log("Send error:", error);
+            log("❌ Send error:", error);
             appendMessage("Sorry, I'm having trouble connecting. Please try again.", false);
-        } finally {
-            sendBtn.disabled = false;
+            messageBeingProcessed = false;
             updateSendButton();
         }
     }
 
     // ================== INPUT VALIDATION ==================
     function validateAndSend() {
+        log("🎯 validateAndSend() called");
         const message = input.value.trim();
         
         if (!message) {
-            // Shake animation for empty input
             const composer = document.querySelector('.chat-composer');
             composer.classList.add('shake');
             setTimeout(() => composer.classList.remove('shake'), 400);
@@ -316,78 +339,25 @@ document.addEventListener("DOMContentLoaded", () => {
         sendMessage(message);
     }
 
-    // ================== NUDGE ANIMATION ==================
-    function startNudgeAnimation() {
-        // Only nudge if chat is closed and page is visible
-        if (!document.hidden && !widget.classList.contains('open')) {
-            launcher.classList.add('nudge');
-            setTimeout(() => launcher.classList.remove('nudge'), 600);
-        }
-    }
-
-    function setupNudging() {
-        // Clear existing interval
-        if (nudgeInterval) {
-            clearInterval(nudgeInterval);
-        }
-        
-        // Only start nudging if chat is closed
-        if (!widget.classList.contains('open')) {
-            nudgeInterval = setInterval(startNudgeAnimation, 5000);
-        }
-    }
-
-    function stopNudging() {
-        if (nudgeInterval) {
-            clearInterval(nudgeInterval);
-            nudgeInterval = null;
-        }
-        launcher.classList.remove('nudge');
-    }
-
-    // ================== MOBILE KEYBOARD HANDLING ==================
-    function setupMobileKeyboardHandling() {
-        if ('visualViewport' in window) {
-            function handleViewportChange() {
-                const viewport = window.visualViewport;
-                const heightDiff = window.innerHeight - viewport.height;
-                
-                if (heightDiff > 150) { // Keyboard is likely open
-                    panel.classList.add('keyboard-active');
-                    panel.style.height = `calc(${viewport.height}px - 60px)`;
-                } else {
-                    panel.classList.remove('keyboard-active');
-                    panel.style.height = '';
-                }
-            }
-            
-            window.visualViewport.addEventListener('resize', handleViewportChange);
-            window.visualViewport.addEventListener('scroll', handleViewportChange);
-        } else {
-            // Fallback for older browsers
-            window.addEventListener('resize', () => {
-                if (window.innerHeight < 500 && panel.classList.contains('is-open')) {
-                    panel.classList.add('keyboard-active');
-                } else {
-                    panel.classList.remove('keyboard-active');
-                }
-            });
-        }
-    }
-
     // ================== EVENT LISTENERS ==================
     
     // Launcher click
     launcher.addEventListener("click", () => {
+        log("🎯 Launcher clicked");
         openChat();
-        stopNudging();
     });
 
     // Close button click
-    closeBtn.addEventListener("click", closeChat);
+    closeBtn.addEventListener("click", () => {
+        log("🎯 Close button clicked");
+        closeChat();
+    });
 
     // Send button click
-    sendBtn.addEventListener("click", validateAndSend);
+    sendBtn.addEventListener("click", () => {
+        log("🎯 Send button clicked");
+        validateAndSend();
+    });
 
     // Input events
     input.addEventListener("input", () => {
@@ -395,63 +365,56 @@ document.addEventListener("DOMContentLoaded", () => {
         autoResizeTextarea();
     });
 
-    // Enter key to send (but not Shift+Enter)
+    // Enter key to send
     input.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
+            log("🎯 Enter key pressed");
             e.preventDefault();
             validateAndSend();
         }
     });
 
-    // Keyboard navigation
+    // Escape key to close
     document.addEventListener("keydown", (e) => {
-        // Escape to close chat
         if (e.key === "Escape" && widget.classList.contains("open")) {
+            log("🎯 Escape key pressed");
             closeChat();
-        }
-        
-        // Tab navigation management
-        if (e.key === "Tab" && widget.classList.contains("open")) {
-            const focusableElements = panel.querySelectorAll(
-                'input, textarea, button, [tabindex]:not([tabindex="-1"])'
-            );
-            const firstElement = focusableElements[0];
-            const lastElement = focusableElements[focusableElements.length - 1];
-            
-            if (e.shiftKey && document.activeElement === firstElement) {
-                e.preventDefault();
-                lastElement.focus();
-            } else if (!e.shiftKey && document.activeElement === lastElement) {
-                e.preventDefault();
-                firstElement.focus();
-            }
         }
     });
 
-    // Visibility change handling for nudging
+    // DEBUG: Track page visibility
     document.addEventListener("visibilitychange", () => {
-        if (document.hidden) {
-            stopNudging();
-        } else {
-            setupNudging();
+        log(`👁️ Page visibility changed: ${document.hidden ? 'HIDDEN' : 'VISIBLE'}`);
+    });
+
+    // DEBUG: Track window focus
+    window.addEventListener("focus", () => log("🎯 Window FOCUSED"));
+    window.addEventListener("blur", () => log("😴 Window BLURRED"));
+
+    // DEBUG: Intercept beforeunload
+    window.addEventListener("beforeunload", (e) => {
+        log("⚠️ beforeunload event fired!");
+        if (messageBeingProcessed) {
+            log("⚠️ WARNING: Page unloading while message is being processed!");
+        }
+        // This should only fire when actually leaving the page
+        if (websocket && websocket.readyState === WebSocket.OPEN) {
+            websocket.close(1000, "Page unload");
+        }
+    });
+
+    // DEBUG: Track any click on page
+    document.addEventListener("click", (e) => {
+        if (!widget.contains(e.target)) {
+            log(`🎯 Click outside widget on: ${e.target.tagName}.${e.target.className}`);
         }
     });
 
     // ================== INITIALIZATION ==================
     
-    // Set initial send button state
     updateSendButton();
     
-    // Setup mobile keyboard handling
-    setupMobileKeyboardHandling();
-    
-    // Start nudge animation
-    setupNudging();
-    
-    // Add welcome message after a short delay
-    setTimeout(() => {
-        log("Chat widget ready for interactions");
-    }, 500);
-
-    log("Chat Widget fully initialized with session:", SESSION_ID);
+    log("🚀 Chat Widget fully initialized");
+    log(`🔧 Debug mode: ENABLED`);
+    log(`👤 Session ID: ${SESSION_ID}`);
 });

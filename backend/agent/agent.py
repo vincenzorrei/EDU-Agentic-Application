@@ -153,7 +153,7 @@ Chat History: {chat_history}
             handle_parsing_errors=self._handle_parsing_error,  # Funzione custom
             max_iterations=5,
             return_intermediate_steps=False,
-            early_stopping_method="generate",  # Forza generazione di Final Answer
+            # early_stopping_method="generate",  # Forza generazione di Final Answer
         )
 
         return agent_executor
