@@ -20,7 +20,7 @@ Un chatbot intelligente per la scoperta di film Netflix, sviluppato con LangChai
 
 #### 2. Widget Aperto - Attesa
 ![Widget Aperto](assets/open_chat.png)
-*Il widget espanso che mostra il messaggio di attesa durante l'elaborazione*
+*Il widget espanso che mostra il messaggio di attesa prima della richiesta*
 
 #### 3. Widget con Risposta
 ![Widget con Risposta](assets/response.png)
