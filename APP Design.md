@@ -29,7 +29,7 @@ Chatbot intelligente per la scoperta di film su Netflix attraverso conversazioni
 │  💾 DATA LAYER                                                 │
 │    ├── 🎞️ Films Vector Store (53 movies, rich descriptions)    │
 │    ├── 👥 Users Vector Store (conversation history)            │
-│    └── 📊 Chroma Database (FAISS-like, persistent)             │
+│    └── 📊 Chroma Database (persistent vector storage)         │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -278,7 +278,7 @@ User: "Qualcosa come i film che mi sono piaciuti"
 - **Safe Descriptions:** Focus su mood invece che eventi specifici
 
 ### **Performance Optimizations**
-- **Vector Store Persistence:** Chroma disk storage
+- **Vector Store Persistence:** ChromaDB disk storage con persistenza automatica
 - **Parallel Tool Execution:** RunnableParallel per web research
 - **Memory Management:** Window-based conversation history
 - **Connection Pooling:** WebSocket persistenti
@@ -311,7 +311,7 @@ User: "Qualcosa come i film che mi sono piaciuti"
 - ✅ API key validation
 
 ### **Scalability Considerations**
-- **Vector Store:** Chroma supporta scaling horizontale
+- **Vector Store:** ChromaDB supporta scaling horizontale e distribuito
 - **Memory Management:** Session-based isolation
 - **Tool Architecture:** Plugin-ready per nuovi data sources
 - **LLM Abstraction:** Provider-agnostic implementation

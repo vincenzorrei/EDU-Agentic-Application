@@ -10,11 +10,27 @@ Un chatbot intelligente per la scoperta di film Netflix, sviluppato con LangChai
 - **Interfaccia Moderna**: Chat widget responsive con design Netflix-style
 - **Memory Conversazionale**: Mantiene il contesto delle conversazioni per personalizzazione
 
+## 📱 Interfaccia Utente
+
+### Schermate del Sistema
+
+#### 1. Widget Chiuso
+![Widget Chiuso](assets/widget.png)
+*Il widget Netflix-style posizionato in basso a destra quando non è attivo*
+
+#### 2. Widget Aperto - Attesa
+![Widget Aperto](assets/open_chat.png)
+*Il widget espanso che mostra il messaggio di attesa durante l'elaborazione*
+
+#### 3. Widget con Risposta
+![Widget con Risposta](assets/response.png)
+*Il widget che mostra la risposta formattata dell'AI con raccomandazioni e link Netflix*
+
 ## 🏗️ Architettura Tecnica
 
 ### Backend
 - **LangChain Agent**: Orchestratore principale con 3 tools specializzati
-- **Vector Database**: FAISS per ricerca semantica su film e conversazioni utenti
+- **Vector Database**: ChromaDB per ricerca semantica su film e conversazioni utenti
 - **WebSocket**: Comunicazione real-time tra frontend e backend
 - **FastAPI**: Framework web moderno per API REST e WebSocket
 
@@ -160,14 +176,14 @@ EDU-Agentic-Application/
 - Assicurati che il WebSocket sia accessibile
 
 **Errori di memoria:**
-- Il sistema usa FAISS in-memory, riavvia il backend se necessario
+- Il sistema usa ChromaDB con persistenza su disco, riavvia il backend se necessario
 - Controlla i log per errori di vector store
 
 ## 📊 Performance
 
 - **Latenza**: < 2 secondi per risposta tipica
 - **Concorrenza**: Supporta multiple sessioni simultanee
-- **Memoria**: ~200MB per il vector store in memoria
+- **Memoria**: ChromaDB con persistenza su disco per storage efficiente
 - **Scalabilità**: Architettura modulare per espansioni future
 
 ## 🤝 Contributi

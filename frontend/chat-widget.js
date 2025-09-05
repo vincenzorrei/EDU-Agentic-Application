@@ -149,6 +149,9 @@ document.addEventListener("DOMContentLoaded", () => {
         html = html.replace(/^:\d+\s+(.+)$/gm, '<li>$1</li>');
         html = html.replace(/^:-\s+(.+)$/gm, '<li>$1</li>');
         
+        // Links (must be before text formatting to avoid conflicts)
+        html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+        
         // Text formatting
         html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
         html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
